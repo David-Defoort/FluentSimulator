@@ -54,6 +54,19 @@ namespace FluentSim
             }
         }
 
+        public class ErrorDetails
+        {
+           public int statusCode;
+           public string name;
+           public string message;
+        }
+
+        public class ErrorResponse
+        {
+           [JsonProperty(Required = Required.Always)]
+           public ErrorDetails error;
+        }
+
         private void TryToProcessRequest(IAsyncResult ar)
         {
             var context = ((HttpListener) ar.AsyncState).EndGetContext(ar);
@@ -92,8 +105,21 @@ namespace FluentSim
 
             byte[] buffer = matchingRoute.BinaryOutput;
 
-            if(buffer == null)
-                buffer = Encoding.UTF8.GetBytes(matchingRoute.GetBody(receivedRequest));
+            if ( buffer == null )
+            {
+               string body = matchingRoute.GetBody( receivedRequest );
+               try
+               {
+                  ErrorResponse errorResponse = JsonConvert.DeserializeObject<ErrorResponse>( body );
+                  response.StatusCode = errorResponse.error.statusCode;
+               }
+               catch ( Exception )
+               {
+                  // ignored
+               }
+
+               buffer = Encoding.UTF8.GetBytes( body );
+            }
 
             response.ContentLength64 = buffer.Length;
             var output = response.OutputStream;
